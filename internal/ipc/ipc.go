@@ -11,6 +11,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 )
 
 const (
@@ -31,6 +32,10 @@ type Workspace struct {
 	Urgent  bool   `json:"urgent"`
 	Output  string `json:"output"`
 }
+
+// Timeout bounds every request to sway, so that a hung sway cannot keep a
+// command, and the state lock it holds, waiting forever.
+const Timeout = 2 * time.Second
 
 type Conn struct {
 	c net.Conn
@@ -91,6 +96,11 @@ func (c *Conn) Read() (uint32, []byte, error) {
 }
 
 func (c *Conn) roundTrip(typ uint32, payload []byte) ([]byte, error) {
+	if err := c.c.SetDeadline(time.Now().Add(Timeout)); err != nil {
+		return nil, err
+	}
+	// Cleared again so that a subscribed connection can wait for events.
+	defer c.c.SetDeadline(time.Time{})
 	if err := c.send(typ, payload); err != nil {
 		return nil, err
 	}

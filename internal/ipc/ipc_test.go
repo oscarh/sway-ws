@@ -1,7 +1,12 @@
 package ipc
 
 import (
+	"errors"
+	"net"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"gotest.tools/v3/assert"
 )
@@ -28,4 +33,27 @@ func TestOnOutput(t *testing.T) {
 	}
 	_, ok := OnOutput(nil, "eDP-1")
 	assert.Assert(t, !ok)
+}
+
+func TestRequestTimesOutWhenSwayDoesNotAnswer(t *testing.T) {
+	sock := filepath.Join(t.TempDir(), "sway.sock")
+	l, err := net.Listen("unix", sock)
+	assert.NilError(t, err)
+	defer l.Close()
+	go func() {
+		c, err := l.Accept()
+		if err == nil {
+			defer c.Close()
+			time.Sleep(2 * Timeout)
+		}
+	}()
+	t.Setenv("SWAYSOCK", sock)
+
+	c, err := Dial()
+	assert.NilError(t, err)
+	defer c.Close()
+	start := time.Now()
+	_, err = c.Workspaces()
+	assert.Assert(t, errors.Is(err, os.ErrDeadlineExceeded), "got %v", err)
+	assert.Assert(t, time.Since(start) < Timeout+time.Second)
 }
