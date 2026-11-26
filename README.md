@@ -133,9 +133,10 @@ parent-death signal, and no shell is kept around per module.
 // ... one per position, then waybar-more and waybar-other N the same way
 ```
 
-No other waybar module may use signal 8. The signal number assumes a
-glibc-built waybar (`SIGRTMIN` is 34); with musl, as on Alpine, it is 35
-and the modules would not refresh. A module with nothing to show
+No other waybar module may use signal 8. `SIGRTMIN` depends on the C
+library waybar was built with (34 with glibc, 35 with musl), so sway-ws
+reads it from the running waybar: waybar handles `SIGRTMIN+1` to
+`SIGRTMAX`, which `/proc/<pid>/status` shows. A module with nothing to show
 prints empty text, which hides it.
 
 CSS classes set by the modules:

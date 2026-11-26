@@ -15,10 +15,55 @@ import (
 	"github.com/oscarh/sway-ws/internal/render"
 )
 
-// The workspace modules use "signal": 8 in the waybar config; waybar maps it
-// to SIGRTMIN+8. SIGRTMIN is a libc value, 34 with glibc; a waybar built
-// against musl uses 35 and would not refresh.
-const refreshSignal = syscall.Signal(34 + 8)
+// The workspace modules use "signal": 8 in the waybar config, which waybar
+// maps to SIGRTMIN+8.
+const signalOffset = 8
+
+// SIGRTMIN is not a constant: the C library decides it at run time (34 with
+// glibc, 35 with musl), and what counts is the value waybar was built with,
+// not anything Go or our own libc would report. Waybar handles exactly
+// SIGRTMIN+1 to SIGRTMAX, so its SIGRTMIN is the highest signal below
+// SIGRTMAX that it does not handle, which /proc shows in SigCgt.
+const (
+	defaultRTMin = 34
+	sigRTMax     = 64
+)
+
+// rtminFromMask finds SIGRTMIN in a SigCgt mask, where bit n-1 is signal n.
+// It requires the handled run to include our signal, so that an unrelated
+// mask is not mistaken for waybar's.
+func rtminFromMask(mask uint64) (int, bool) {
+	sig := sigRTMax
+	for sig > 32 && mask&(1<<(sig-1)) != 0 {
+		sig--
+	}
+	if sig == sigRTMax || sig <= 32 || sig+signalOffset > sigRTMax {
+		return 0, false
+	}
+	return sig, true
+}
+
+func waybarRTMin(pid int) (int, error) {
+	data, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/status")
+	if err != nil {
+		return 0, err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		hex, ok := strings.CutPrefix(line, "SigCgt:")
+		if !ok {
+			continue
+		}
+		mask, err := strconv.ParseUint(strings.TrimSpace(hex), 16, 64)
+		if err != nil {
+			return 0, err
+		}
+		if rt, ok := rtminFromMask(mask); ok {
+			return rt, nil
+		}
+		return 0, fmt.Errorf("no real-time signal range in waybar's SigCgt %s", strings.TrimSpace(hex))
+	}
+	return 0, fmt.Errorf("no SigCgt in /proc/%d/status", pid)
+}
 
 // A focus change produces a burst of workspace events (focus, empty, init);
 // coalescing them keeps the bar from re-running every module several times.
@@ -61,6 +106,7 @@ func waybarOnce(cmd string, n int) error {
 // this every change would refresh every module once per bar.
 type signaller struct {
 	bar  int
+	sig  syscall.Signal
 	path string
 	lock *os.File
 }
@@ -82,7 +128,7 @@ func (s *signaller) signal() {
 		}
 		s.lock = f
 	}
-	_ = syscall.Kill(s.bar, refreshSignal)
+	_ = syscall.Kill(s.bar, s.sig)
 }
 
 // newSignaller warns on stderr, which ends up in waybar's log, when it
@@ -94,6 +140,12 @@ func newSignaller() *signaller {
 		warn("no process named waybar among the ancestors; the workspace modules will not refresh")
 		return s
 	}
+	rtmin, err := waybarRTMin(s.bar)
+	if err != nil {
+		warn(fmt.Sprintf("%v; assuming SIGRTMIN is %d", err, defaultRTMin))
+		rtmin = defaultRTMin
+	}
+	s.sig = syscall.Signal(rtmin + signalOffset)
 	dir := os.Getenv("XDG_RUNTIME_DIR")
 	if dir == "" {
 		warn("XDG_RUNTIME_DIR is not set; the workspace modules will not refresh")
