@@ -35,6 +35,9 @@ const usage = `usage: sway-ws <command>
   waybar-more N   waybar module: count of workspaces beyond the first N
   waybar-other N  waybar module: N-th other project
   version         print the version
+
+Menus run wmenu unless SWAY_WS_MENU is set to a dmenu-compatible command,
+which is run through sh with the prompt in SWAY_WS_PROMPT.
 `
 
 func main() {
@@ -226,6 +229,10 @@ func (s *session) move(ws string) error {
 // menu returns an empty string if the user aborted.
 func menu(prompt string, items []string) (string, error) {
 	cmd := exec.Command("wmenu", "-b", "-i", "-p", prompt)
+	if custom := os.Getenv("SWAY_WS_MENU"); custom != "" {
+		cmd = exec.Command("sh", "-c", custom)
+		cmd.Env = append(os.Environ(), "SWAY_WS_PROMPT="+prompt)
+	}
 	cmd.Stdin = strings.NewReader(strings.Join(items, "\n") + "\n")
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()

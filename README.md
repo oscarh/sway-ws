@@ -54,6 +54,13 @@ What is selected or typed in `pick` / `pick-move` resolves as:
 cleared unnumbered workspace (`home:notes`) gets the lowest free slot.
 Characters that sway's command parser treats specially are dropped.
 
+### Menu
+
+Menus use `wmenu -b -i`. Set `SWAY_WS_MENU` to any dmenu-compatible command
+to replace it; it is run through `sh` and gets the prompt in
+`SWAY_WS_PROMPT`, e.g.
+`SWAY_WS_MENU='wofi --dmenu --insensitive --matching fuzzy --prompt "$SWAY_WS_PROMPT"'`.
+
 ## Several outputs
 
 A project can be on several outputs at once, with one of its workspaces on
