@@ -3,6 +3,7 @@ package state
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -113,4 +114,29 @@ func TestFileCorruptIsEmpty(t *testing.T) {
 	assert.NilError(t, err)
 	defer f.Close()
 	assert.DeepEqual(t, f.Load(), New())
+}
+
+func TestSnapshotAndRestore(t *testing.T) {
+	s := New()
+	s.Observe("home:1")
+	s.Snapshot([]string{"home:1", "home:4"})
+	s.Observe("web:1")
+	s.Snapshot(nil)
+	assert.DeepEqual(t, s.Projects["home"].Visible, []string{"home:1", "home:4"})
+
+	all := slices.Concat(names, []string{"home:4"})
+	assert.DeepEqual(t, s.Restore("home", "home:1", all, []string{"web:1"}), []string{"home:4"})
+	assert.DeepEqual(t, s.Restore("home", "home:4", all, []string{"web:1"}), []string{"home:1"})
+	// Already on screen, or gone.
+	assert.DeepEqual(t, s.Restore("home", "home:1", all, []string{"home:4"}), []string(nil))
+	assert.DeepEqual(t, s.Restore("home", "home:1", names, nil), []string(nil))
+	assert.DeepEqual(t, s.Restore("nope", "nope:1", all, nil), []string(nil))
+}
+
+func TestRenameUpdatesVisible(t *testing.T) {
+	s := New()
+	s.Observe("home:1")
+	s.Snapshot([]string{"home:1", "home:2:fw"})
+	s.Rename("home:2:fw", "home:2:db")
+	assert.DeepEqual(t, s.Projects["home"].Visible, []string{"home:1", "home:2:db"})
 }

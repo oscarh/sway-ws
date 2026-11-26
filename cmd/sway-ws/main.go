@@ -137,10 +137,13 @@ func slotArg(args []string) (int, error) {
 
 // session holds the state lock for the duration of one command.
 type session struct {
-	conn  *ipc.Conn
-	file  *state.File
-	st    *state.State
-	names []string
+	conn    *ipc.Conn
+	file    *state.File
+	st      *state.State
+	names   []string
+	visible []string
+	// start is the project that had the focus when the command started.
+	start string
 }
 
 // withSession first records the focused workspace, so switches made outside
@@ -170,9 +173,22 @@ func withSession(fn func(*session) error) error {
 		return err
 	}
 	s := &session{conn: conn, file: file, st: file.Load(), names: ipc.Names(wss)}
+	for _, w := range wss {
+		if w.Visible {
+			s.visible = append(s.visible, w.Name)
+		}
+	}
 	if f, ok := ipc.Focused(wss); ok {
 		s.st.Observe(f.Name)
 	}
+	s.start = s.st.Current
+	var mine []string
+	for _, ws := range s.visible {
+		if wsname.Parse(ws).Project == s.start {
+			mine = append(mine, ws)
+		}
+	}
+	s.st.Snapshot(mine)
 
 	fnErr := fn(s)
 
@@ -182,8 +198,18 @@ func withSession(fn func(*session) error) error {
 	return errors.Join(fnErr, file.Save(s.st))
 }
 
+// focus goes to ws. Entering another project first brings back the
+// workspaces it had on the other outputs, all in one sway command so the
+// outputs switch together.
 func (s *session) focus(ws string) error {
-	if err := s.conn.Command("workspace " + ipc.Quote(ws)); err != nil {
+	var cmds []string
+	if p := wsname.Parse(ws).Project; p != s.start {
+		for _, r := range s.st.Restore(p, ws, s.names, s.visible) {
+			cmds = append(cmds, "workspace "+ipc.Quote(r))
+		}
+	}
+	cmds = append(cmds, "workspace "+ipc.Quote(ws))
+	if err := s.conn.Command(strings.Join(cmds, "; ")); err != nil {
 		return err
 	}
 	s.st.Observe(ws)

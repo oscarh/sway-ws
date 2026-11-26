@@ -46,10 +46,20 @@ What is selected or typed in `pick` / `pick-move` resolves as:
   lowest free slot (`home:3:name`)
 - anything else with a colon: created as typed
 
+## Several outputs
+
+A project can be on several outputs at once, with one of its workspaces on
+each. Every command records which workspaces of the current project are on
+screen. Entering another project (`project-toggle`, the picker, a click on
+another project) brings back the workspaces it had on screen before
+focusing the target, in a single sway command so the outputs switch
+together. Within a project, sway's own output handling applies.
+
 ## State
 
 There is no daemon. Each command records the focused workspace, acts, and
-writes per-project history (last and previous workspace, previous project)
+writes per-project history (last and previous workspace, the workspaces on
+screen, previous project)
 to `$XDG_RUNTIME_DIR/sway-ws/<hash>.json`. The file is keyed on `$SWAYSOCK`,
 so nested sway sessions are kept apart, and it is locked while a command
 runs. Switches made outside sway-ws, such as mouse clicks, are picked up by

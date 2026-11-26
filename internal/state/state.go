@@ -10,6 +10,9 @@ import (
 type Project struct {
 	Last string `json:"last,omitempty"`
 	Prev string `json:"prev,omitempty"`
+	// Visible are the project's workspaces that were on screen, on any
+	// output, the last time it had the focus.
+	Visible []string `json:"visible,omitempty"`
 }
 
 type State struct {
@@ -82,6 +85,34 @@ func (s *State) ProjectToggleTarget(names []string) (string, bool) {
 	return s.ProjectTarget(s.ProjectPrev, names)
 }
 
+// Snapshot records which workspaces of the current project are on screen.
+// An empty set is ignored: then the project is not on screen at all, and
+// the previous record is the better one to restore.
+func (s *State) Snapshot(visible []string) {
+	if len(visible) == 0 || s.Current == "" {
+		return
+	}
+	s.project(s.Current).Visible = slices.Clone(visible)
+}
+
+// Restore lists the workspaces to show before focusing target when entering
+// project, so that the project comes back on every output it was on.
+// Workspaces that are gone, have moved to another project, or are already
+// on screen are skipped.
+func (s *State) Restore(project, target string, names, visibleNow []string) []string {
+	p, ok := s.Projects[project]
+	if !ok {
+		return nil
+	}
+	var res []string
+	for _, ws := range p.Visible {
+		if ws != target && valid(ws, project, names) && !slices.Contains(visibleNow, ws) {
+			res = append(res, ws)
+		}
+	}
+	return res
+}
+
 func (s *State) Rename(from, to string) {
 	for _, p := range s.Projects {
 		if p.Last == from {
@@ -89,6 +120,11 @@ func (s *State) Rename(from, to string) {
 		}
 		if p.Prev == from {
 			p.Prev = to
+		}
+		for i, ws := range p.Visible {
+			if ws == from {
+				p.Visible[i] = to
+			}
 		}
 	}
 }
