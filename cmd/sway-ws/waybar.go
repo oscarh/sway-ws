@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -83,15 +84,24 @@ func (s *signaller) signal() {
 	_ = syscall.Kill(s.bar, refreshSignal)
 }
 
+// newSignaller warns on stderr, which ends up in waybar's log, when it
+// cannot signal: the workspace modules would then never refresh, and
+// nothing else would show why.
 func newSignaller() *signaller {
 	s := &signaller{bar: waybarAncestor()}
+	if s.bar <= 0 {
+		warn("no process named waybar among the ancestors; the workspace modules will not refresh")
+		return s
+	}
 	dir := os.Getenv("XDG_RUNTIME_DIR")
-	if s.bar <= 0 || dir == "" {
+	if dir == "" {
+		warn("XDG_RUNTIME_DIR is not set; the workspace modules will not refresh")
 		s.bar = 0
 		return s
 	}
 	dir = filepath.Join(dir, "sway-ws")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
+		warn(err.Error() + "; the workspace modules will not refresh")
 		s.bar = 0
 		return s
 	}
@@ -110,6 +120,10 @@ func removeStaleLocks(dir string) {
 			os.Remove(p)
 		}
 	}
+}
+
+func warn(msg string) {
+	fmt.Fprintln(os.Stderr, "sway-ws:", msg)
 }
 
 // waybarProject streams the project module and tells its own waybar to
