@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -184,4 +185,36 @@ func Names(wss []Workspace) []string {
 		names[i] = w.Name
 	}
 	return names
+}
+
+// OnOutput is the workspace shown on the output that sel names, or the
+// focused one if sel is empty or matches nothing. "!NAME" means any output
+// other than NAME; the focused one wins, then the first by output name.
+func OnOutput(wss []Workspace, sel string) (Workspace, bool) {
+	if sel == "" {
+		return Focused(wss)
+	}
+	not, negated := strings.CutPrefix(sel, "!")
+	var match []Workspace
+	for _, w := range wss {
+		if !w.Visible {
+			continue
+		}
+		if (negated && w.Output != not) || (!negated && w.Output == sel) {
+			match = append(match, w)
+		}
+	}
+	if len(match) == 0 {
+		return Focused(wss)
+	}
+	slices.SortFunc(match, func(a, b Workspace) int {
+		if a.Focused != b.Focused {
+			if a.Focused {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(a.Output, b.Output)
+	})
+	return match[0], true
 }

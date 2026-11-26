@@ -28,7 +28,7 @@ The current project is always the one of the focused workspace.
 | `pick-move`      | As `pick`, but move the focused window there                   |
 | `rename`         | Rename the focused workspace (Tab copies the current name)     |
 | `label`          | Change only the label of the focused workspace (`-` clears)    |
-| `nth N`          | Focus the N-th workspace of the current project (bar clicks)   |
+| `nth N`          | Focus the N-th workspace of the project on an output (clicks)  |
 | `other N`        | Go to the N-th other project, alphabetically (bar clicks)      |
 | `waybar`         | Waybar module: the current project, streamed                   |
 | `waybar-ws N`    | Waybar module: the N-th workspace of the current project       |
@@ -104,6 +104,14 @@ workspace change it sends its own waybar `SIGRTMIN+8`, and the other
 modules, which run once per signal, refresh. With several bars in one
 waybar process, a lock file makes only one module send the signal.
 
+Each bar shows the project of the workspace on its own output, which
+waybar passes to the modules in `WAYBAR_OUTPUT_NAME`. The workspace shown
+on that output is marked `active`, or `focused` when the output has the
+focus. Waybar does not pass the output to click commands, so `nth` and
+`other` take `--output OUT` (`!NAME` meaning an output other than NAME), and
+each bar needs its own module definitions; generate them rather than
+writing them by hand.
+
 Start the modules with `exec` so that waybar is their direct parent. The
 `waybar` module then exits as soon as waybar does, through the kernel's
 parent-death signal, and no shell is kept around per module.
@@ -120,7 +128,7 @@ parent-death signal, and no shell is kept around per module.
     "return-type": "json",
     "interval": "once",
     "signal": 8,
-    "on-click": "$HOME/.local/bin/sway-ws nth 1"
+    "on-click": "$HOME/.local/bin/sway-ws nth 1 --output eDP-1"
 },
 // ... one per position, then waybar-more and waybar-other N the same way
 ```
@@ -130,12 +138,12 @@ prints empty text, which hides it.
 
 CSS classes set by the modules:
 
-| Module  | Classes                                                 |
-|---------|---------------------------------------------------------|
-| project | `project`                                               |
-| ws      | `ws`, plus one of `focused`, `visible`, `urgent`        |
-| more    | `ws more`, plus `urgent` if a hidden one is urgent      |
-| other   | `other`, plus `urgent` or `visible` (on another output) |
+| Module  | Classes                                                    |
+|---------|------------------------------------------------------------|
+| project | `project`                                                  |
+| ws      | `ws`, plus one of `focused`, `active`, `visible`, `urgent` |
+| more    | `ws more`, plus `urgent` if a hidden one is urgent         |
+| other   | `other`, `first` on the first, plus `urgent` or `visible`  |
 
 A workspace is urgent when sway marks it so: a native Wayland window that
 requests activation (sway's default `focus_on_window_activation urgent`),

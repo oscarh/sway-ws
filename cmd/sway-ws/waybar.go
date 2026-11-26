@@ -41,14 +41,15 @@ func waybarOnce(cmd string, n int) error {
 	if err != nil {
 		return err
 	}
+	output := os.Getenv("WAYBAR_OUTPUT_NAME")
 	var out render.Output
 	switch cmd {
 	case "waybar-more":
-		out = render.More(wss, n)
+		out = render.More(wss, output, n)
 	case "waybar-other":
-		out = render.Other(wss, n)
+		out = render.Other(wss, output, n)
 	default:
-		out = render.Position(wss, n)
+		out = render.Position(wss, output, n)
 	}
 	return writeJSON(bufio.NewWriter(os.Stdout), out)
 }
@@ -140,13 +141,14 @@ func waybarProject() error {
 	defer query.Close()
 
 	sig := newSignaller()
+	output := os.Getenv("WAYBAR_OUTPUT_NAME")
 	out := bufio.NewWriter(os.Stdout)
 	emit := func() error {
 		wss, err := query.Workspaces()
 		if err != nil {
 			return err
 		}
-		if err := writeJSON(out, render.Project(wss)); err != nil {
+		if err := writeJSON(out, render.Project(wss, output)); err != nil {
 			return err
 		}
 		sig.signal()

@@ -27,8 +27,13 @@ const usage = `usage: sway-ws <command>
   pick-move       pick a project or workspace with wmenu and move the window there
   rename          rename the focused workspace
   label           change only the label of the focused workspace ("-" clears)
-  nth N           focus the N-th workspace of the current project (bar clicks)
-  other N         go to the N-th other project, alphabetically (bar clicks)
+  nth N [--output OUT]
+                  focus the N-th workspace of the project shown on OUT
+                  (default: the focused output); for bar clicks
+  other N [--output OUT]
+                  go to the N-th other project, alphabetically, as seen
+                  from OUT; for bar clicks. "!NAME" means an output other
+                  than NAME
 
   waybar          waybar module: current project, streamed; also signals
                   waybar (SIGRTMIN+8) to refresh the modules below
@@ -93,24 +98,24 @@ func run(cmd string, args []string) error {
 	case "label":
 		return label()
 	case "nth":
-		n, err := slotArg(args)
+		n, output, err := barArgs(args)
 		if err != nil {
 			return err
 		}
 		return withSession(func(s *session) error {
-			ws := wsname.InProject(s.names, s.st.Current)
+			ws := wsname.InProject(s.names, s.projectOn(output))
 			if n > len(ws) {
 				return nil
 			}
 			return s.focus(ws[n-1].Raw)
 		})
 	case "other":
-		n, err := slotArg(args)
+		n, output, err := barArgs(args)
 		if err != nil {
 			return err
 		}
 		return withSession(func(s *session) error {
-			others := wsname.Others(s.names, s.st.Current)
+			others := wsname.Others(s.names, s.projectOn(output))
 			if n > len(others) {
 				return nil
 			}
@@ -148,11 +153,24 @@ func slotArg(args []string) (int, error) {
 	return n, nil
 }
 
+// barArgs parses "N [--output OUT]". Waybar does not tell click commands
+// which bar they came from, so the bar config passes the output.
+func barArgs(args []string) (int, string, error) {
+	var output string
+	if len(args) == 3 && args[1] == "--output" {
+		output = args[2]
+		args = args[:1]
+	}
+	n, err := slotArg(args)
+	return n, output, err
+}
+
 // session holds the state lock for the duration of one command.
 type session struct {
 	conn    *ipc.Conn
 	file    *state.File
 	st      *state.State
+	wss     []ipc.Workspace
 	names   []string
 	visible []string
 	// start is the project that had the focus when the command started.
@@ -185,7 +203,7 @@ func withSession(fn func(*session) error) error {
 	if err != nil {
 		return err
 	}
-	s := &session{conn: conn, file: file, st: file.Load(), names: ipc.Names(wss)}
+	s := &session{conn: conn, file: file, st: file.Load(), wss: wss, names: ipc.Names(wss)}
 	for _, w := range wss {
 		if w.Visible {
 			s.visible = append(s.visible, w.Name)
@@ -209,6 +227,14 @@ func withSession(fn func(*session) error) error {
 		s.st.Prune(ipc.Names(wss))
 	}
 	return errors.Join(fnErr, file.Save(s.st))
+}
+
+// projectOn is the project shown on output, see ipc.OnOutput.
+func (s *session) projectOn(output string) string {
+	if w, ok := ipc.OnOutput(s.wss, output); ok {
+		return wsname.Parse(w.Name).Project
+	}
+	return s.st.Current
 }
 
 // focus goes to ws. Entering another project first brings back the
