@@ -63,3 +63,28 @@ func TestFreeSlot(t *testing.T) {
 func TestOthers(t *testing.T) {
 	assert.DeepEqual(t, Others([]string{"web:1", "slack", "home:1"}, "home"), []string{"main", "web"})
 }
+
+func TestCleanLabel(t *testing.T) {
+	assert.Equal(t, CleanLabel(`  my "db"; x,y\ `), "my db xy")
+}
+
+func TestWithLabel(t *testing.T) {
+	names := []string{"home:1", "home:2:fw", "home:notes", "slack"}
+	cases := []struct {
+		ws, label, want string
+	}{
+		{"home:2:fw", "db", "home:2:db"},
+		{"home:2:fw", "", "home:2"},
+		{"home:1", "mail", "home:1:mail"},
+		{"home:notes", "todo", "home:todo"},
+		{"home:notes", "", "home:3"},
+		{"slack", "chat", "chat"},
+		{"slack", "", "slack"},
+		{"slack", "a:b", "slack"},
+	}
+	for _, c := range cases {
+		t.Run(c.ws+"/"+c.label, func(t *testing.T) {
+			assert.Equal(t, WithLabel(Parse(c.ws), c.label, names), c.want)
+		})
+	}
+}

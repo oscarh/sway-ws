@@ -27,6 +27,7 @@ The current project is always the one of the focused workspace.
 | `pick`           | wmenu over all projects and workspaces; focus the choice       |
 | `pick-move`      | As `pick`, but move the focused window there                   |
 | `rename`         | Rename the focused workspace (Tab copies the current name)     |
+| `label`          | Change only the label of the focused workspace (`-` clears)    |
 | `nth N`          | Focus the N-th workspace of the current project (bar clicks)   |
 | `other N`        | Go to the N-th other project, alphabetically (bar clicks)      |
 | `waybar`         | Waybar module: the current project, streamed                   |
@@ -45,6 +46,13 @@ What is selected or typed in `pick` / `pick-move` resolves as:
 - any other bare name: a new workspace in the current project, in its
   lowest free slot (`home:3:name`)
 - anything else with a colon: created as typed
+
+### Labels
+
+`label` keeps the project and number and only changes the label:
+`home:2:fw` becomes `home:2:db`, or `home:2` when cleared with `-`. A
+cleared unnumbered workspace (`home:notes`) gets the lowest free slot.
+Characters that sway's command parser treats specially are dropped.
 
 ## Several outputs
 
@@ -77,6 +85,7 @@ bindsym $mod+Shift+Tab exec $sp project-toggle
 bindsym $mod+t exec $sp pick
 bindsym $mod+Shift+t exec $sp pick-move
 bindsym $mod+r exec $sp rename
+bindsym $mod+n exec $sp label
 ```
 
 ## Waybar

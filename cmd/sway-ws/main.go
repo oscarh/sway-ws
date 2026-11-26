@@ -25,6 +25,7 @@ const usage = `usage: sway-ws <command>
   pick            pick a project or workspace with wmenu and focus it
   pick-move       pick a project or workspace with wmenu and move the window there
   rename          rename the focused workspace
+  label           change only the label of the focused workspace ("-" clears)
   nth N           focus the N-th workspace of the current project (bar clicks)
   other N         go to the N-th other project, alphabetically (bar clicks)
 
@@ -79,6 +80,8 @@ func run(cmd string, args []string) error {
 		return pick(cmd == "pick-move")
 	case "rename":
 		return rename()
+	case "label":
+		return label()
 	case "nth":
 		n, err := slotArg(args)
 		if err != nil {
@@ -284,15 +287,42 @@ func rename() error {
 	// Tab in wmenu copies the item into the input, which gives an editable
 	// prefill of the current name.
 	to, err := menu("rename "+focused.Name+" to", []string{focused.Name})
-	if err != nil || to == "" || to == focused.Name {
+	if err != nil || to == "" {
 		return err
 	}
+	return renameWorkspace(focused.Name, to)
+}
+
+func label() error {
+	wss, err := currentNames()
+	if err != nil {
+		return err
+	}
+	focused, ok := ipc.Focused(wss)
+	if !ok {
+		return nil
+	}
+	n := wsname.Parse(focused.Name)
+	text, err := menu("label for "+focused.Name+" (- clears)", []string{n.Label})
+	if err != nil || text == "" {
+		return err
+	}
+	if text == "-" {
+		text = ""
+	}
+	return renameWorkspace(focused.Name, wsname.WithLabel(n, wsname.CleanLabel(text), ipc.Names(wss)))
+}
+
+func renameWorkspace(from, to string) error {
+	if to == "" || to == from {
+		return nil
+	}
 	return withSession(func(s *session) error {
-		cmd := "rename workspace " + ipc.Quote(focused.Name) + " to " + ipc.Quote(to)
+		cmd := "rename workspace " + ipc.Quote(from) + " to " + ipc.Quote(to)
 		if err := s.conn.Command(cmd); err != nil {
 			return err
 		}
-		s.st.Rename(focused.Name, to)
+		s.st.Rename(from, to)
 		if wss, err := s.conn.Workspaces(); err == nil {
 			if f, ok := ipc.Focused(wss); ok {
 				s.st.Observe(f.Name)

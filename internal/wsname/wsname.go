@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 type Name struct {
@@ -134,4 +135,39 @@ func Others(names []string, current string) []string {
 		}
 	}
 	return res
+}
+
+// CleanLabel drops characters that sway's command parser or the bar treat
+// specially, and surrounding space.
+func CleanLabel(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || strings.ContainsRune(`"'\;,`, r) {
+			return -1
+		}
+		return r
+	}, s)
+	return strings.TrimSpace(s)
+}
+
+// WithLabel is n renamed to carry label, keeping its project and number. An
+// empty label clears it; an unnumbered workspace then gets the lowest free
+// slot, since "project:" alone is not a name.
+func WithLabel(n Name, label string, names []string) string {
+	switch {
+	case n.Num > 0 && label == "":
+		return Format(n.Project, n.Num)
+	case n.Num > 0:
+		return Format(n.Project, n.Num) + ":" + label
+	case !strings.Contains(n.Raw, ":"):
+		// A workspace in Main by lack of a prefix: the whole name is its
+		// label, and it must stay without a colon to stay in Main.
+		if label == "" || strings.Contains(label, ":") {
+			return n.Raw
+		}
+		return label
+	case label == "":
+		return Format(n.Project, FreeSlot(names, n.Project))
+	default:
+		return n.Project + ":" + label
+	}
 }
