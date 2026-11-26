@@ -21,7 +21,7 @@ func TestObserveTracksPerProject(t *testing.T) {
 	assert.DeepEqual(t, *s.Projects["home"], Project{Last: "home:2:fw", Prev: "home:1"})
 	assert.DeepEqual(t, *s.Projects["web"], Project{Last: "web:1", Prev: "web:2"})
 	assert.Equal(t, s.Current, "web")
-	assert.Equal(t, s.ProjectPrev, "home")
+	assert.DeepEqual(t, s.Recent, []string{"web", "home"})
 }
 
 func TestObserveSameWorkspaceKeepsPrev(t *testing.T) {
@@ -37,12 +37,12 @@ func TestProjectToggleReturnsToLastWorkspace(t *testing.T) {
 	s.Observe("home:3")
 	s.Observe("web:2")
 
-	ws, ok := s.ProjectToggleTarget(names)
+	ws, ok := s.ProjectToggleTarget(names, "main")
 	assert.Assert(t, ok)
 	assert.Equal(t, ws, "home:3")
 
 	s.Observe(ws)
-	ws, ok = s.ProjectToggleTarget(names)
+	ws, ok = s.ProjectToggleTarget(names, "main")
 	assert.Assert(t, ok)
 	assert.Equal(t, ws, "web:2")
 }
@@ -139,4 +139,67 @@ func TestRenameUpdatesVisible(t *testing.T) {
 	s.Snapshot([]string{"home:1", "home:2:fw"})
 	s.Rename("home:2:fw", "home:2:db")
 	assert.DeepEqual(t, s.Projects["home"].Visible, []string{"home:1", "home:2:db"})
+}
+
+var withMain = slices.Concat(names, []string{"dev:1", "slack", "main:2"})
+
+func TestProjectTogglePassesOverHome(t *testing.T) {
+	s := New()
+	s.Observe("home:3")
+	s.Observe("web:2")
+	s.Observe("slack")
+
+	// From home back to the latest other project.
+	ws, ok := s.ProjectToggleTarget(withMain, "main")
+	assert.Assert(t, ok)
+	assert.Equal(t, ws, "web:2")
+
+	// A look at home does not break toggling between web and home.
+	s.Observe("web:2")
+	ws, ok = s.ProjectToggleTarget(withMain, "main")
+	assert.Assert(t, ok)
+	assert.Equal(t, ws, "home:3")
+}
+
+func TestProjectToggleFallsBackToHome(t *testing.T) {
+	s := New()
+	s.Observe("slack")
+	s.Observe("web:1")
+	ws, ok := s.ProjectToggleTarget([]string{"web:1", "slack"}, "main")
+	assert.Assert(t, ok)
+	assert.Equal(t, ws, "slack")
+
+	s.Observe("slack")
+	_, ok = s.ProjectToggleTarget([]string{"slack"}, "main")
+	assert.Assert(t, !ok, "nowhere to go from home without other projects")
+}
+
+func TestHomeAndBack(t *testing.T) {
+	s := New()
+	s.Observe("dev:1")
+	s.Observe("web:2")
+
+	ws, ok := s.HomeTarget(withMain, "main")
+	assert.Assert(t, ok)
+	assert.Equal(t, ws, "main:2", "no home workspace used yet: the lowest-numbered")
+
+	s.Observe("slack")
+	ws, ok = s.HomeTarget(withMain, "main")
+	assert.Assert(t, ok)
+	assert.Equal(t, ws, "web:2", "back to where we were")
+
+	s.Observe(ws)
+	ws, _ = s.HomeTarget(withMain, "main")
+	assert.Equal(t, ws, "slack", "the home workspace last used")
+
+	ws, _ = s.HomeTarget(names, "main")
+	assert.Equal(t, ws, "main:1", "home without workspaces gets its first")
+}
+
+func TestPruneDropsGoneProjectsFromRecent(t *testing.T) {
+	s := New()
+	s.Observe("gone:1")
+	s.Observe("web:1")
+	s.Prune(names)
+	assert.DeepEqual(t, s.Recent, []string{"web"})
 }

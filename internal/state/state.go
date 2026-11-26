@@ -16,9 +16,10 @@ type Project struct {
 }
 
 type State struct {
-	Projects    map[string]*Project `json:"projects"`
-	Current     string              `json:"current,omitempty"`
-	ProjectPrev string              `json:"project_prev,omitempty"`
+	Projects map[string]*Project `json:"projects"`
+	Current  string              `json:"current,omitempty"`
+	// Recent lists projects, most recently focused first.
+	Recent []string `json:"recent,omitempty"`
 }
 
 func New() *State {
@@ -40,10 +41,11 @@ func (s *State) project(name string) *Project {
 // Observe records that ws is now focused.
 func (s *State) Observe(ws string) {
 	proj := wsname.Parse(ws).Project
-	if s.Current != "" && s.Current != proj {
-		s.ProjectPrev = s.Current
-	}
 	s.Current = proj
+	if len(s.Recent) == 0 || s.Recent[0] != proj {
+		s.Recent = slices.DeleteFunc(s.Recent, func(r string) bool { return r == proj })
+		s.Recent = slices.Insert(s.Recent, 0, proj)
+	}
 	p := s.project(proj)
 	if p.Last != ws {
 		p.Prev = p.Last
@@ -78,11 +80,35 @@ func (s *State) ToggleTarget(names []string) (string, bool) {
 	return p.Prev, true
 }
 
-func (s *State) ProjectToggleTarget(names []string) (string, bool) {
-	if s.ProjectPrev == "" || s.ProjectPrev == s.Current {
-		return "", false
+// ProjectToggleTarget is the workspace to land on in the most recent
+// project other than the current one. The home project is passed over, so
+// a look at it does not come between the projects being toggled; it is
+// used only when there is no other project.
+func (s *State) ProjectToggleTarget(names []string, home string) (string, bool) {
+	for _, p := range s.Recent {
+		if p == s.Current || p == home {
+			continue
+		}
+		if ws, ok := s.ProjectTarget(p, names); ok {
+			return ws, true
+		}
 	}
-	return s.ProjectTarget(s.ProjectPrev, names)
+	if s.Current != home {
+		return s.ProjectTarget(home, names)
+	}
+	return "", false
+}
+
+// HomeTarget goes to the home project, or back from it to the project
+// Alt+Tab would go to. A home project without workspaces gets its first.
+func (s *State) HomeTarget(names []string, home string) (string, bool) {
+	if s.Current == home {
+		return s.ProjectToggleTarget(names, home)
+	}
+	if ws, ok := s.ProjectTarget(home, names); ok {
+		return ws, true
+	}
+	return wsname.Format(home, 1), true
 }
 
 // Snapshot records which workspaces of the current project are on screen.
@@ -138,4 +164,5 @@ func (s *State) Prune(names []string) {
 			delete(s.Projects, name)
 		}
 	}
+	s.Recent = slices.DeleteFunc(s.Recent, func(p string) bool { return !slices.Contains(live, p) })
 }

@@ -5,10 +5,10 @@ projects by name, and numbered within each project.
 
 ## Naming
 
-Workspaces are named `<project>:<n>[:<label>]`, e.g. `home:1`,
-`home:2:fw`. The number is the slot that `focus N` and `move N` address;
+Workspaces are named `<project>:<n>[:<label>]`, e.g. `app:1`,
+`app:2:fw`. The number is the slot that `focus N` and `move N` address;
 the label is only for reading. A project may also hold unnumbered
-workspaces (`home:notes`).
+workspaces (`app:notes`).
 
 A name without a colon (`slack`, or sway's default `1`) belongs to the
 `main` project, so workspaces created outside the convention stay
@@ -23,7 +23,8 @@ The current project is always the one of the focused workspace.
 | `focus N`        | Focus slot N of the current project (created if missing)       |
 | `move N`         | Move the focused window to slot N of the current project       |
 | `toggle`         | Previous workspace within the current project                  |
-| `project-toggle` | Previous project, landing on the workspace last used there     |
+| `project-toggle` | Previous project other than home, at its last used workspace   |
+| `home [NAME]`    | Home project (default `main`), or back to the previous project |
 | `pick`           | wmenu over all projects and workspaces; focus the choice       |
 | `pick-move`      | As `pick`, but move the focused window there                   |
 | `rename`         | Rename the focused workspace (Tab copies the current name)     |
@@ -44,14 +45,14 @@ What is selected or typed in `pick` / `pick-move` resolves as:
 - an existing project: the workspace last used in it
 - `proj:` (trailing colon): the same, or `proj:1` for a new project
 - any other bare name: a new workspace in the current project, in its
-  lowest free slot (`home:3:name`)
+  lowest free slot (`app:3:name`)
 - anything else with a colon: created as typed
 
 ### Labels
 
 `label` keeps the project and number and only changes the label:
-`home:2:fw` becomes `home:2:db`, or `home:2` when cleared with `-`. A
-cleared unnumbered workspace (`home:notes`) gets the lowest free slot.
+`app:2:fw` becomes `app:2:db`, or `app:2` when cleared with `-`. A
+cleared unnumbered workspace (`app:notes`) gets the lowest free slot.
 Characters that sway's command parser treats specially are dropped.
 
 ### Menu
@@ -70,11 +71,19 @@ another project) brings back the workspaces it had on screen before
 focusing the target, in a single sway command so the outputs switch
 together. Within a project, sway's own output handling applies.
 
+### Home
+
+One project is home, `main` unless given, meant for what is shared
+between projects: chat, mail. `home` goes there, or back again.
+`project-toggle` passes over it, so a look at home does not come between
+the two projects being toggled; it goes home only when there is no other
+project. `project-toggle --home NAME` must name the same home as `home`.
+
 ## State
 
 There is no daemon. Each command records the focused workspace, acts, and
 writes per-project history (last and previous workspace, the workspaces on
-screen, previous project)
+screen) and the projects in order of use
 to `$XDG_RUNTIME_DIR/sway-ws/<hash>.json`. The file is keyed on `$SWAYSOCK`,
 so nested sway sessions are kept apart, and it is locked while a command
 runs. Switches made outside sway-ws, such as mouse clicks, are picked up by
@@ -87,8 +96,8 @@ workspaces it describes.
 set $sp ~/.local/bin/sway-ws
 bindsym $mod+1 exec $sp focus 1           # ... through 9
 bindsym $mod+Shift+1 exec $sp move 1      # ... through 9
-bindsym $mod+Tab exec $sp toggle
-bindsym $mod+Shift+Tab exec $sp project-toggle
+bindsym $mod+Tab exec $sp project-toggle
+bindsym $mod+m exec $sp home
 bindsym $mod+t exec $sp pick
 bindsym $mod+Shift+t exec $sp pick-move
 bindsym $mod+r exec $sp rename

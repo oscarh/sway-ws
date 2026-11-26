@@ -22,7 +22,10 @@ const usage = `usage: sway-ws <command>
   focus N         focus workspace N of the current project
   move N          move the focused window to workspace N of the current project
   toggle          focus the previously used workspace of the current project
-  project-toggle  focus the last used workspace of the previous project
+  project-toggle [--home NAME]
+                  focus the last used workspace of the most recent other
+                  project, passing over the home project (default main)
+  home [NAME]     go to the home project (default main), or back again
   pick            pick a project or workspace with wmenu and focus it
   pick-move       pick a project or workspace with wmenu and move the window there
   rename          rename the focused workspace
@@ -85,8 +88,30 @@ func run(cmd string, args []string) error {
 			return nil
 		})
 	case "project-toggle":
+		home := wsname.Main
+		switch {
+		case len(args) == 2 && args[0] == "--home":
+			home = args[1]
+		case len(args) != 0:
+			return errors.New("usage: project-toggle [--home NAME]")
+		}
 		return withSession(func(s *session) error {
-			if ws, ok := s.st.ProjectToggleTarget(s.names); ok {
+			if ws, ok := s.st.ProjectToggleTarget(s.names, home); ok {
+				return s.focus(ws)
+			}
+			return nil
+		})
+	case "home":
+		home := wsname.Main
+		switch len(args) {
+		case 0:
+		case 1:
+			home = args[0]
+		default:
+			return errors.New("usage: home [NAME]")
+		}
+		return withSession(func(s *session) error {
+			if ws, ok := s.st.HomeTarget(s.names, home); ok {
 				return s.focus(ws)
 			}
 			return nil
