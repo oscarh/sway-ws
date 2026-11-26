@@ -76,8 +76,9 @@ func TestBarProjectOnBothOutputs(t *testing.T) {
 		{Name: "home:1", Output: "eDP-1", Visible: true},
 		{Name: "home:2", Output: "DP-1", Visible: true, Focused: true},
 	}
+	// Only the bar on the focused output underlines the focused workspace.
 	assert.DeepEqual(t, Position(wss, "eDP-1", 1).Class, []string{"ws", "active"})
-	assert.DeepEqual(t, Position(wss, "eDP-1", 2).Class, []string{"ws", "focused"})
+	assert.DeepEqual(t, Position(wss, "eDP-1", 2).Class, []string{"ws", "visible"})
 	assert.DeepEqual(t, Position(wss, "DP-1", 1).Class, []string{"ws", "visible"})
 	assert.DeepEqual(t, Position(wss, "DP-1", 2).Class, []string{"ws", "focused"})
 }

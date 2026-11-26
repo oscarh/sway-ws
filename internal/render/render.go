@@ -119,7 +119,9 @@ func Position(wss []ipc.Workspace, output string, pos int) Output {
 	switch {
 	case w.Urgent:
 		class = append(class, "urgent")
-	case w.Focused:
+	// Focused and active are about this bar's output only: the focused
+	// workspace on another output is just visible from here.
+	case w.Visible && w.Output == v.output && w.Focused:
 		class = append(class, "focused")
 	case w.Visible && w.Output == v.output:
 		// Shown on this bar's output, while another output has the focus.
