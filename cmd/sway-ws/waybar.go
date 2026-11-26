@@ -16,7 +16,8 @@ import (
 )
 
 // The workspace modules use "signal": 8 in the waybar config; waybar maps it
-// to SIGRTMIN+8, and glibc's SIGRTMIN is 34.
+// to SIGRTMIN+8. SIGRTMIN is a libc value, 34 with glibc; a waybar built
+// against musl uses 35 and would not refresh.
 const refreshSignal = syscall.Signal(34 + 8)
 
 // A focus change produces a burst of workspace events (focus, empty, init);

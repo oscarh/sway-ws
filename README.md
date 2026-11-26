@@ -133,7 +133,9 @@ parent-death signal, and no shell is kept around per module.
 // ... one per position, then waybar-more and waybar-other N the same way
 ```
 
-No other waybar module may use signal 8. A module with nothing to show
+No other waybar module may use signal 8. The signal number assumes a
+glibc-built waybar (`SIGRTMIN` is 34); with musl, as on Alpine, it is 35
+and the modules would not refresh. A module with nothing to show
 prints empty text, which hides it.
 
 CSS classes set by the modules:
