@@ -1,6 +1,6 @@
 module github.com/oscarh/sway-ws
 
-go 1.27.4
+go 1.22.0
 
 require gotest.tools/v3 v3.5.2
 

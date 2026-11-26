@@ -8,16 +8,24 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: golang:1.27
+    strategy:
+      matrix:
+        # The minimum from go.mod, and the current release.
+        go: ["1.22", "1.27"]
+    container: golang:${{ matrix.go }}
     steps:
       - uses: actions/checkout@v5
       # The job runs as root in the container, but the checkout is owned by
       # the runner user; git, and so go build's VCS stamping, refuses that.
       - name: Trust the checkout
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      # Only with the current toolchain: its vet knows the most checks, and
+      # flags standard library APIs newer than the go.mod minimum.
       - name: Check formatting
+        if: matrix.go == '1.27'
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
       - name: Vet
+        if: matrix.go == '1.27'
         run: go vet ./...
       - name: Test
         run: go test ./...
