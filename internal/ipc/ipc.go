@@ -11,6 +11,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -51,16 +52,27 @@ func SocketPath() (string, error) {
 	return "", errors.New("neither SWAYSOCK nor I3SOCK is set")
 }
 
+// Dial connects to sway. Sway keeps only a short queue of pending
+// connections, and waybar starts all workspace modules at once, so a full
+// queue (EAGAIN) is retried for up to Timeout rather than failing.
 func Dial() (*Conn, error) {
 	path, err := SocketPath()
 	if err != nil {
 		return nil, err
 	}
-	c, err := net.Dial("unix", path)
-	if err != nil {
-		return nil, err
+	deadline := time.Now().Add(Timeout)
+	wait := 2 * time.Millisecond
+	for {
+		c, err := net.Dial("unix", path)
+		if err == nil {
+			return &Conn{c: c}, nil
+		}
+		if !errors.Is(err, syscall.EAGAIN) || time.Now().After(deadline) {
+			return nil, err
+		}
+		time.Sleep(wait)
+		wait = min(2*wait, 50*time.Millisecond)
 	}
-	return &Conn{c: c}, nil
 }
 
 func (c *Conn) Close() error {
