@@ -1,0 +1,9 @@
+version: "2"
+
+linters:
+  # The default set: errcheck, govet, ineffassign, staticcheck, unused.
+  exclusions:
+    presets:
+      # Unchecked errors from Close, os.Remove and writes to stderr, which
+      # only happen in cleanup and error paths here.
+      - std-error-handling
