@@ -111,8 +111,6 @@ func (c *Conn) roundTrip(typ uint32, payload []byte) ([]byte, error) {
 	if err := c.c.SetDeadline(time.Now().Add(Timeout)); err != nil {
 		return nil, err
 	}
-	// Cleared again so that a subscribed connection can wait for events.
-	defer c.c.SetDeadline(time.Time{})
 	if err := c.send(typ, payload); err != nil {
 		return nil, err
 	}
@@ -123,6 +121,11 @@ func (c *Conn) roundTrip(typ uint32, payload []byte) ([]byte, error) {
 			return nil, err
 		}
 		if rtyp == typ {
+			// Cleared so that a subscribed connection can wait for events;
+			// if that fails, its next Read would time out by mistake.
+			if err := c.c.SetDeadline(time.Time{}); err != nil {
+				return nil, err
+			}
 			return reply, nil
 		}
 	}
