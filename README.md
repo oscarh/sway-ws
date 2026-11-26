@@ -104,15 +104,19 @@ workspace change it sends its own waybar `SIGRTMIN+8`, and the other
 modules, which run once per signal, refresh. With several bars in one
 waybar process, a lock file makes only one module send the signal.
 
+Start the modules with `exec` so that waybar is their direct parent. The
+`waybar` module then exits as soon as waybar does, through the kernel's
+parent-death signal, and no shell is kept around per module.
+
 ```jsonc
 "custom/sway-ws": {
-    "exec": "$HOME/.local/bin/sway-ws waybar",
+    "exec": "exec $HOME/.local/bin/sway-ws waybar",
     "return-type": "json",
     "restart-interval": 1,
     "on-click": "$HOME/.local/bin/sway-ws pick"
 },
 "custom/sway-ws-1": {
-    "exec": "$HOME/.local/bin/sway-ws waybar-ws 1",
+    "exec": "exec $HOME/.local/bin/sway-ws waybar-ws 1",
     "return-type": "json",
     "interval": "once",
     "signal": 8,

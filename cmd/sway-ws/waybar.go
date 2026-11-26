@@ -95,12 +95,36 @@ func newSignaller() *signaller {
 		return s
 	}
 	s.path = filepath.Join(dir, "waybar-"+strconv.Itoa(s.bar)+".lock")
+	removeStaleLocks(dir)
 	return s
+}
+
+// removeStaleLocks deletes the lock files of waybar processes that are gone,
+// one is left behind by every waybar restart.
+func removeStaleLocks(dir string) {
+	paths, _ := filepath.Glob(filepath.Join(dir, "waybar-*.lock"))
+	for _, p := range paths {
+		pid := strings.TrimSuffix(strings.TrimPrefix(filepath.Base(p), "waybar-"), ".lock")
+		if _, err := os.Stat("/proc/" + pid); os.IsNotExist(err) {
+			os.Remove(p)
+		}
+	}
 }
 
 // waybarProject streams the project module and tells its own waybar to
 // re-run the per-workspace modules.
 func waybarProject() error {
+	// Exit together with waybar instead of at the next workspace change.
+	// This needs waybar to be the parent, i.e. "exec" in the module's
+	// command, and costs nothing while running.
+	parent := os.Getppid()
+	if _, _, errno := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_SET_PDEATHSIG, uintptr(syscall.SIGTERM), 0); errno != 0 {
+		return errno
+	}
+	if os.Getppid() != parent {
+		return nil
+	}
+
 	events, err := ipc.Dial()
 	if err != nil {
 		return err

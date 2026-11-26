@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -39,6 +40,12 @@ const usage = `usage: sway-ws <command>
 Menus run wmenu unless SWAY_WS_MENU is set to a dmenu-compatible command,
 which is run through sh with the prompt in SWAY_WS_PROMPT.
 `
+
+// The parent-death signal set for the waybar module only counts on the
+// main thread, so main must stay there.
+func init() {
+	runtime.LockOSThread()
+}
 
 func main() {
 	if len(os.Args) < 2 {
